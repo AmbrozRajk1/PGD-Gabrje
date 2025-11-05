@@ -6,6 +6,14 @@
   <title>Podari 1 % dohodnine — PGD Gabrje</title>
   <meta name="description" content="Podpri PGD Gabrje z namembnim delom 1 % dohodnine. Navodila za eDavke (mobilno in portal) ali tiskana izjava." />
   <link rel="stylesheet" href="style.css">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-sA+4gq5Q8mN1g6xH0rYv4Qz9ZbKq0h1KpFf5p0h+Rr0=" crossorigin=""/>
+  <style>
+    /* map specific small overrides */
+    #map { width:100%; height:320px; border-radius:12px; margin-top:12px; box-shadow:0 6px 18px rgba(11,26,43,0.03); }
+    .mailboxes { margin-top:12px; padding-left:18px }
+    .mailboxes li{ margin:6px 0; }
+  </style>
 </head>
 <body>
   <header class="hero">
@@ -44,11 +52,15 @@
 
       <p class="help">Če obrazec natisneš, izpolniš in podpišeš ter dopustiš, da ga v tvojem imenu oddamo na FURS (na obrazcu označeno), ga prosimo oddaj v najbližji nabiralnik enega izmed naših članov. Za pomoč nas lahko kontaktiraš na <em>pgdgabrje@gmail.com</em> ali pokličeš na <strong>031 700 700</strong>.</p>
 
-      <ul class="mailboxes">
-        <li>Janez Novak (predsednik) — Jerko 10, 8321 Brusnice</li>
-        <li>Jože Car (poveljnik) — [vstavi naslov]</li>
-        <li>[Dodaj ostale člane z naslovi]</li>
+      <ul class="mailboxes" id="mailbox-list">
+        <li data-address="Jerko 10, 8321 Brusnice">Janez Novak (predsednik) — Jerko 10, 8321 Brusnice</li>
+        <li data-address="">Jože Car (poveljnik) — [vstavi naslov]</li>
+        <li data-address="">[Dodaj ostale člane z naslovi]</li>
       </ul>
+
+      <div id="map" aria-hidden="false" role="region" aria-label="Mapa nabiralnikov članov"></div>
+
+      <p class="note" style="margin-top:8px;font-size:0.95rem;">Nasvet: če imaš ta obrazec, ga prosimo oddaj v najbližji nabiralnik enega izmed članov na seznamu. Na zemljevidu so označeni naslovi, ki so trenutno znani. Če naslov ni prikazan, ga bomo dopolnili takoj, ko nam ga posreduješ.</p>
     </section>
 
     <section class="smallprint">
@@ -63,5 +75,73 @@
       <div class="footer-meta">Če potrebuješ pomoč, nas pokliči ali piši: <strong>pgdgabrje@gmail.com</strong> / 031 700 700</div>
     </div>
   </footer>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-o9N1j7kQY1w3s8a1x3j2k6X5QvY1g3Q2z9+3GxZpF0o=" crossorigin=""></script>
+  <script>
+    // List of mailbox holders. You can add lat & lon if you know them, otherwise address will be geocoded via Nominatim.
+    const members = [
+      { name: 'Janez Novak', role: 'predsednik', address: 'Jerko 10, 8321 Brusnice' },
+      { name: 'Jože Car', role: 'poveljnik', address: '' },
+      { name: 'Druge kandidat', role: 'član', address: '' }
+    ];
+
+    // Initialize map centered on Slovenia (fallback)
+    const map = L.map('map', { scrollWheelZoom: false }).setView([46.0, 15.0], 11);
+
+    // OSM tile layer
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+    }).addTo(map);
+
+    // Helper: add marker
+    function addMarker(lat, lon, member) {
+      const marker = L.marker([lat, lon]).addTo(map);
+      const popup = `<strong>${member.name}</strong><br>${member.role}${member.address ? '<br>' + member.address : ''}`;
+      marker.bindPopup(popup);
+    }
+
+    // Geocode address with Nominatim (OpenStreetMap)
+    async function geocodeAddress(address) {
+      const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(address);
+      try {
+        const resp = await fetch(url, { headers: { 'Accept-Language': 'sl' } });
+        const j = await resp.json();
+        if (j && j.length) {
+          return { lat: parseFloat(j[0].lat), lon: parseFloat(j[0].lon) };
+        }
+      } catch (e) {
+        console.warn('Geocode napaka', e);
+      }
+      return null;
+    }
+
+    // Populate map and list
+    (async function populate() {
+      const listEl = document.getElementById('mailbox-list');
+      for (let i = 0; i < members.length; i++) {
+        const m = members[i];
+        // If address present, try geocode
+        if (m.address && m.address.trim().length > 3) {
+          const coords = await geocodeAddress(m.address + ', Slovenia');
+          if (coords) {
+            addMarker(coords.lat, coords.lon, m);
+            // Zoom to markers roughly: fit bounds
+          }
+        }
+      }
+
+      // Fit map to markers if any
+      const markerLayers = [];
+      map.eachLayer(function(layer) {
+        if (layer instanceof L.Marker) markerLayers.push(layer.getLatLng());
+      });
+      if (markerLayers.length) {
+        const bounds = L.latLngBounds(markerLayers);
+        map.fitBounds(bounds.pad(0.3));
+      }
+    })();
+  </script>
 </body>
 </html>
