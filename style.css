@@ -15,7 +15,7 @@ html,body{height:100%}
 body{
   margin:0;
   color:var(--text);
-  background: #fffaf9;
+  background: linear-gradient(180deg, #fff 0%, #fffaf9 100%) no-repeat fixed;
   -webkit-font-smoothing:antialiased;
   -moz-osx-font-smoothing:grayscale;
   line-height:1.45;
